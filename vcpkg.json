@@ -1,0 +1,9 @@
+{
+  "dependencies": [
+    "fmt",
+    "freetype",
+    "glew",
+    "sdl2",
+    "sdl2-mixer"
+  ]
+}
