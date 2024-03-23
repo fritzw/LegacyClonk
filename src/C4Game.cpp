@@ -3575,14 +3575,14 @@ void C4Game::LocalPlayerControl(int32_t iPlayer, int32_t iCom)
 		return;
 	}
 	// Local player menu active: convert menu com and control local
-	if (pPlr->Menu.ConvertCom(iCom, iData, true))
+	if (pPlr->Menu.ConvertCom(iCom, iData, true, pPlr))
 	{
 		pPlr->Menu.Control(iCom, iData);
 		return;
 	}
 	// Pre-queue asynchronous menu conversions
 	if (pPlr->Cursor && pPlr->Cursor->Menu)
-		pPlr->Cursor->Menu->ConvertCom(iCom, iData, true);
+		pPlr->Cursor->Menu->ConvertCom(iCom, iData, true, pPlr);
 	// Not for eliminated (checked again in DirectCom, but make sure no control is generated for eliminated players!)
 	if (pPlr->Eliminated) return;
 	// Player control: add to control queue

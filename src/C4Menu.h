@@ -168,7 +168,8 @@ protected:
 	bool fActive; // set if menu is shown - independent of GUI to keep synchronized when there's no GUI
 
 public:
-	bool ConvertCom(int32_t &rCom, int32_t &rData, bool fAsyncConversion);
+	bool ConvertCom(int32_t &rCom, int32_t &rData, bool fAsyncConversion, C4Player* pPlr);
+	StdStrBuf GetMenuControlKeyName(int32_t iMenuControl, C4Player* pPlr);
 	void ClearPointers(C4Object *pObj);
 	bool Refill();
 	void Execute();

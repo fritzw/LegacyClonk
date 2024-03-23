@@ -261,6 +261,7 @@ class C4ConfigGamepad
 public:
 	int32_t Button[C4MaxKey];
 	uint32_t AxisMin[6], AxisMax[6];
+	int32_t MenuButton[CON_MenuCount];
 	bool AxisCalibrated[6];
 	void CompileFunc(StdCompiler *pComp, bool fButtonsOnly = false);
 	void Reset(); // reset all buttons and axis calibration to default

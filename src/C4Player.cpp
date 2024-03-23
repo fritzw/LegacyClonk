@@ -1497,7 +1497,7 @@ void C4Player::InCom(uint8_t byCom, int32_t iData)
 	if (Cursor) if (Cursor->Menu)
 	{
 		int32_t iCom = byCom;
-		Cursor->Menu->ConvertCom(iCom, iData, false);
+		Cursor->Menu->ConvertCom(iCom, iData, false, this); // TODO check what a "cursor object" is and whether gamepad menu command mapping should be used here by passing "this"
 		byCom = iCom;
 	}
 	// Menu control: no single/double processing

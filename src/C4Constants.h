@@ -238,6 +238,13 @@ const uint8_t COM_Help       = 35,
               COM_PlayerMenu = 36,
               COM_Chat       = 37;
 
+enum {
+	CON_MenuEnter = 0,
+	CON_MenuEnterAll = 1,
+	CON_MenuClose = 2,
+	CON_MenuCount = 3,
+};
+
 const uint8_t COM_MenuEnter    = 38,
               COM_MenuEnterAll = 39,
               COM_MenuClose    = 40,
