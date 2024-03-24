@@ -71,6 +71,31 @@ void DrawMenuSymbol(int32_t iMenu, C4Facet &cgo, int32_t iOwner, C4Object *cObj)
 	}
 }
 
+// Convert menu controls (not COMs) to the configured key name for a given player
+static StdStrBuf GetMenuControlKeyName(int32_t iMenuControl, int32_t iPlayer)
+{
+	C4Player* pPlr = Game.Players.Get(iPlayer);
+	if (!pPlr || !Inside<int32_t>(iMenuControl, CON_MenuEnter, CON_MenuCount - 1)) {
+		return StdStrBuf("");
+	}
+
+	if (Inside(pPlr->Control, C4P_Control_GamePad1, C4P_Control_GamePadMax))
+	{
+		auto& config = Config.Gamepads[pPlr->Control - C4P_Control_GamePad1];
+		if (config.MenuButton[iMenuControl] != -1) {
+			return C4KeyCodeEx::KeyCode2String(config.MenuButton[iMenuControl], true, true);
+		}
+	}
+
+	// Could probably make this a static variable somewhere, but it needs to be initialized correctly
+	uint8_t defaultMenuControlToCommonControl[CON_MenuCount];
+	defaultMenuControlToCommonControl[CON_MenuEnter] = CON_Throw;
+	defaultMenuControlToCommonControl[CON_MenuEnterAll] = CON_Special2;
+	defaultMenuControlToCommonControl[CON_MenuClose] = CON_Dig;
+
+	return PlrControlKeyName(pPlr->Number, defaultMenuControlToCommonControl[iMenuControl], true);
+}
+
 // C4MenuItem
 
 C4MenuItem::C4MenuItem(C4Menu *pMenu, int32_t iIndex, const char *szCaption,
@@ -856,21 +881,21 @@ void C4Menu::DrawElement(C4FacetEx &cgo)
 		{
 			// Normal enter
 			cgoControl = cgoExtra.TruncateSection(C4FCT_Left);
-			DrawCommandKey(cgoControl, COM_Throw, false, PlrControlKeyName(iPlayer, Com2Control(COM_Throw), true).getData());
+			DrawCommandKey(cgoControl, COM_Throw, false, GetMenuControlKeyName(CON_MenuEnter, iPlayer).getData());
 			cgoControl = cgoExtra.TruncateSection(C4FCT_Left);
 			GfxR->fctOKCancel.Draw(cgoControl, true, 0, 0);
 			// Enter-all on Special2
 			if (pItem && pItem->Command2[0])
 			{
 				cgoControl = cgoExtra.TruncateSection(C4FCT_Left);
-				DrawCommandKey(cgoControl, COM_Special2, false, PlrControlKeyName(iPlayer, Com2Control(COM_Special2), true).getData());
+				DrawCommandKey(cgoControl, COM_Special2, false, GetMenuControlKeyName(CON_MenuEnterAll, iPlayer).getData());
 				cgoControl = cgoExtra.TruncateSection(C4FCT_Left);
 				GfxR->fctOKCancel.Draw(cgoControl, true, 2, 1);
 			}
 		}
 		// Draw menu 'close' command
 		cgoControl = cgoExtra.TruncateSection(C4FCT_Left);
-		DrawCommandKey(cgoControl, COM_Dig, false, PlrControlKeyName(iPlayer, Com2Control(COM_Dig), true).getData());
+		DrawCommandKey(cgoControl, COM_Dig, false, GetMenuControlKeyName(CON_MenuClose, iPlayer).getData());
 		cgoControl = cgoExtra.TruncateSection(C4FCT_Left);
 		// Close command contains "Exit"? Show an exit symbol in the status bar.
 		if (SSearch(CloseCommand.getData(), "\"Exit\"")) GfxR->fctExit.Draw(cgoControl);
@@ -1034,64 +1059,45 @@ void C4Menu::AdjustSelection()
 		SetSelection(iSel, iSel != Selection, true);
 }
 
-// Convert menu controls (not COMs) to the configured key name for a given player
-StdStrBuf C4Menu::GetMenuControlKeyName(int32_t iMenuControl, C4Player* pPlr)
+static bool ConvertComForGamepad(int32_t& rCom, C4Player* pPlr)
 {
-	if (Inside<int32_t>(iMenuControl, CON_MenuEnter, CON_MenuCount - 1)) {
-		return StdStrBuf("");
+	// For gamepads, menu controls can be configured separately from normal controls (see LegacyClonk issue #115)
+	if (!pPlr || !Inside(pPlr->Control, C4P_Control_GamePad1, C4P_Control_GamePadMax)) {
+		return false;
 	}
 
-	if (pPlr && Inside(pPlr->Control, C4P_Control_GamePad1, C4P_Control_GamePadMax))
-	{
-		auto& config = Config.Gamepads[pPlr->Control - C4P_Control_GamePad1];
-		if (config.MenuButton[iMenuControl] != -1) {
-			return C4KeyCodeEx::KeyCode2String(config.MenuButton[iMenuControl], true, true);
-		}
+	// Reverse lookup the pressed gamepad button
+	auto& config = Config.Gamepads[pPlr->Control - C4P_Control_GamePad1];
+	int32_t rControl = Com2Control(rCom);
+	int32_t rButton = config.Button[rControl];
+	bool valid = rButton >= 0;
+
+	// Check if the pressed button is mapped to a menu action
+	if (rButton == config.MenuButton[CON_MenuEnter]) {
+		rCom = COM_MenuEnter;
+		return true;
+	}
+	else if (rButton == config.MenuButton[CON_MenuEnterAll]) {
+		rCom = COM_MenuEnterAll;
+		return true;
+	}
+	else if (rButton == config.MenuButton[CON_MenuClose]) {
+		rCom = COM_MenuClose;
+		return true;
 	}
 
-	// Could probably make this a static variable somewhere, but it needs to be initialized correctly
-	uint8_t defaultMenuControlToCommonControl[CON_MenuCount];
-	defaultMenuControlToCommonControl[CON_MenuEnter] = CON_Throw;
-	defaultMenuControlToCommonControl[CON_MenuEnterAll] = CON_Special2;
-	defaultMenuControlToCommonControl[CON_MenuClose] = CON_Dig;
-
-	return PlrControlKeyName(pPlr->Number, defaultMenuControlToCommonControl[iMenuControl], true);
+	return false;
 }
 
-bool C4Menu::ConvertCom(int32_t &rCom, int32_t &rData, bool fAsyncConversion, C4Player* pPlr)
+bool C4Menu::ConvertCom(int32_t& rCom, int32_t& rData, bool fAsyncConversion, C4Player* pPlr)
 {
 	// This function converts normal Coms to menu Coms before they are send to the queue
 
 	// Menu not active
 	if (!IsActive()) return false;
 
-	// For gamepads, menu controls can be configured separately from normal controls (see LegacyClonk issue #115)
-	if (pPlr && Inside(pPlr->Control, C4P_Control_GamePad1, C4P_Control_GamePadMax))
-	{
-		// Reverse lookup the pressed gamepad button
-		auto& config = Config.Gamepads[pPlr->Control - C4P_Control_GamePad1];
-		int32_t rControl = Com2Control(rCom);
-		int32_t rButton = config.Button[rControl];
-		bool valid = rButton >= 0;
-
-		// Check if the pressed button is mapped to a menu action
-		if (rButton == config.MenuButton[CON_MenuEnter]) rCom = COM_MenuEnter;
-		else if (rButton == config.MenuButton[CON_MenuEnterAll]) rCom = COM_MenuEnterAll;
-		else if (rButton == config.MenuButton[CON_MenuClose]) rCom = COM_MenuClose;
-		else {
-			switch (rCom)
-			{
-				// Convert recognized menu coms
-				case COM_Up:       rCom = COM_MenuUp;       break;
-				case COM_Left:     rCom = COM_MenuLeft;     break;
-				case COM_Down:     rCom = COM_MenuDown;     break;
-				case COM_Right:    rCom = COM_MenuRight;    break;
-				// Not a menu com: do nothing
-				default: return true;
-			}
-		}
-	}
-	else {
+	// First check if the player has configured custom buttons for menu control
+	if (!ConvertComForGamepad(rCom, pPlr)) {
 		// Convert plain com control to menu com
 		switch (rCom)
 		{
