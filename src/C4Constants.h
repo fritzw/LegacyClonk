@@ -198,6 +198,7 @@ const uint8_t COM_Left  = 1,
               COM_CursorToggle = 14,
               COM_CursorFirst = COM_CursorLeft,
               COM_CursorLast = COM_CursorToggle,
+              COM_Jump = 15,
 
               COM_Left_R       = COM_Left     + 16,
               COM_Right_R      = COM_Right    + 16,
